@@ -1,18 +1,18 @@
 import React, { Component, } from 'react';
-import { FlatList, Text, View, StyleSheet, Dimensions, SafeAreaView, Modal, TouchableOpacity, TextInput, Image, Picker } from 'react-native';
+import { FlatList, Text, View, SafeAreaView, TouchableOpacity, Image } from 'react-native';
 import GetUsersService from '../../services/get.users.service';
 import { User } from '../../shared/models/user.model';
 import Loader from '../../shared/components/loader';
 import moment from 'moment';
-import { RenderItem } from './render.item';
 import DelayInput from "react-native-debounce-input";
+import { styles } from '../../syles/user.filter.screen';
+import { renderItem } from './render.item';
 
-const deviceHeight = Dimensions.get('screen').height;
-const deviceWidth = Dimensions.get('screen').width;
-
-const sexType = [
-    'Female', 'Male', 'Both'
-];
+enum sexType {
+    a = 'Female',
+    b = 'Male',
+    c = 'Both'
+}
 
 interface Props {
 
@@ -23,7 +23,7 @@ interface State {
     filteredData: User[],
     isFilterModalVisible: boolean,
     selectedFilter: string,
-    selectedSex: string,
+    selectedSex: 'Female' | 'Male' | 'Both',
     ageRange: {
         from: string,
         to: string,
@@ -68,35 +68,27 @@ class UsersFilter extends Component<Props, State> {
         })
     }
 
-    public _renderItem = ({ item, index }: RenderItem) => (
-        <View style={[styles.renderItem, index === this.state.filteredData.length - 1 ? { borderBottomWidth: 0 } : null]}>
-            <View style={styles.avatarView}>
-                <View>
-                    <Image style={styles.userImage} source={{ uri: 'https://img.favpng.com/2/24/4/user-profile-computer-icons-png-favpng-6CB3By2TFDKyEjfXFbx3LaRR5.jpg' }} />
-                    {item.gender === 'female' ? <Image style={styles.sexImage} source={{ uri: 'https://img.icons8.com/ios/50/000000/female.png' }} /> : <Image style={styles.sexImage} source={{ uri: 'https://img.icons8.com/ios/50/000000/male.png' }} />}
-                    <View style={[styles.status, item.status === 'active' ? { backgroundColor: 'green' } : null]}></View>
-                </View>
-                <Text style={styles.nameText}>{item.first_name} {item.last_name}</Text>
-            </View>
-            <Text>{+moment(new Date()).format('YYYY') - +moment(item.dob).format('YYYY')}</Text>
-        </View>
-    );
-
     public applyFilters() {
         this.filterByName();
-        this.filterByAge();
-        this.filterBySex();
+        
+        
     }
 
     public filterByName() {
-        let newFilteredUsers = this.state.data.filter((item: User) => !(item.first_name + ' ' + item.last_name).toLowerCase().indexOf((this.state.nameSurnameValue.toLowerCase())) || this.state.nameSurnameValue === '');
+        let newFilteredUsers =
+            this.state.data.filter((item: User) => !(item.first_name + ' ' + item.last_name)
+                .toLowerCase()
+                .indexOf((this.state.nameSurnameValue.toLowerCase())) ||
+                this.state.nameSurnameValue === '');
 
         this.setState({
             filteredData: [...newFilteredUsers],
-        });
+        }, () => this.filterByAge());
     }
 
     private filterByAge() {
+        console.log(this.state.filteredData);
+        
         let newFilteredUsers = this.state.filteredData.filter((item: User) =>
             +moment(new Date()).format('YYYY') -
             +moment(new Date(item.dob)).format('YYYY') <=
@@ -109,7 +101,7 @@ class UsersFilter extends Component<Props, State> {
         this.setState({
             filteredData: [...newFilteredUsers],
             isLoading: false
-        });
+        },() => this.filterBySex());
     }
 
     private filterBySex() {
@@ -118,6 +110,67 @@ class UsersFilter extends Component<Props, State> {
         this.setState({
             filteredData: [...newFilteredUsers]
         });
+    }
+
+    private clearSelectedFilter = () => {
+        this.setState({ selectedFilter: '' });
+    }
+
+    private clearAllFilters = () => {
+        this.setState({
+            selectedFilter: '',
+            filteredData: this.state.data,
+            isFilterModalVisible: false,
+            nameSurnameValue: '',
+            ageRange: { from: '', to: '' },
+            selectedSex: 'Both'
+        })
+    }
+
+    private closeOpenFilters = () => {
+        this.setState({
+            isFilterModalVisible: !this.state.isFilterModalVisible,
+            selectedFilter: ''
+        })
+    }
+
+    private search(value: string) {
+        this.setState({
+            nameSurnameValue: value
+        });
+        this.applyFilters();
+    }
+
+    private CloseFilter = () => {
+        return <TouchableOpacity
+            style={styles.closeButton}
+            onPress={this.clearSelectedFilter}
+        >
+            <Image style={styles.filterImg} source={{ uri: 'https://img.icons8.com/ios/40/ffffff/delete-sign.png' }} />
+        </TouchableOpacity>
+    }
+
+    private inputFromAge(value: string) {
+        this.setState({
+            ageRange: { from: value, to: this.state.ageRange.to }
+        })
+        this.applyFilters();
+    }
+
+    private inputToAge(value: string) {
+        this.setState({
+            ageRange: { from: this.state.ageRange.from, to: value }
+        })
+        this.applyFilters();
+    }
+
+    private selectSexType(type: "Female" | "Male" | "Both") {
+        this.setState({
+            selectedSex: type
+        }, () => {
+            this.applyFilters();
+        });
+
     }
 
     render() {
@@ -129,117 +182,83 @@ class UsersFilter extends Component<Props, State> {
             nameSurnameValue,
             isLoading
         } = this.state;
+
         return (
             <SafeAreaView>
                 <View style={styles.header}>
                     <Text style={styles.totalUsers}>Total: {filteredData.length}</Text>
                     <TouchableOpacity
-                        onPress={() => this.setState({
-                            isFilterModalVisible: !isFilterModalVisible,
-                            selectedFilter: ''
-                        })}
+                        style={styles.mrRight15}
+                        onPress={this.closeOpenFilters}
                     >
-                        {!isFilterModalVisible ? <Text style={{ marginRight: 15 }}><Image style={[{ height: 30, width: 30 }]} source={{ uri: 'https://www.ifonly.com/images/io/filter%20icon_big.png' }} /></Text> :
-                            <TouchableOpacity
-                                style={styles.filtersButton}
-                                onPress={() => this.setState({ isFilterModalVisible: !isFilterModalVisible })}
-                            >
-                                <Image style={{ height: 30, width: 30 }} source={{ uri: 'https://img.icons8.com/ios/40/ffffff/delete-sign.png' }} />
-                            </TouchableOpacity>}
+                        {!isFilterModalVisible ? <Image style={styles.filterImg} source={{ uri: 'https://www.ifonly.com/images/io/filter%20icon_big.png' }} /> :
+                            <Image style={styles.filterImg} source={{ uri: 'https://img.icons8.com/ios/40/ffffff/delete-sign.png' }} />}
                     </TouchableOpacity>
                 </View>
                 {isFilterModalVisible ?
                     <View style={styles.filters}>
                         {
                             !selectedFilter && !selectedFilter ?
-                                <View style={{ width: deviceWidth, flexDirection: 'row', justifyContent: 'space-around' }}>
-                                    <TouchableOpacity onPress={() => this.selectFilter('search')}><Image style={{ width: 30, height: 30 }} source={{ uri: 'https://img.icons8.com/ios/30/ffffff/search--v1.png' }} /></TouchableOpacity>
-                                    <TouchableOpacity onPress={() => this.selectFilter('age')}><Image style={{ width: 30, height: 30 }} source={{ uri: 'https://img.icons8.com/ios/30/ffffff/lifecycle--v1.png' }} /></TouchableOpacity>
-                                    <TouchableOpacity onPress={() => this.selectFilter('sex')}><Image style={{ width: 30, height: 30 }} source={{ uri: 'https://img.icons8.com/ios/30/ffffff/gender.png' }} /></TouchableOpacity>
-                                    <TouchableOpacity onPress={() => this.setState({ selectedFilter: '', filteredData: this.state.data, isFilterModalVisible: false, nameSurnameValue: '', ageRange: { from: '', to: '' }, selectedSex: 'Both' })}><Image style={{ width: 30, height: 30 }} source={{ uri: 'https://img.icons8.com/ios/30/ffffff/clear-filters.png' }} /></TouchableOpacity>
+                                <View style={styles.submenu}>
+                                    <TouchableOpacity onPress={() => this.selectFilter('search')}><Image style={styles.filterImg} source={{ uri: 'https://img.icons8.com/ios/30/ffffff/search--v1.png' }} /></TouchableOpacity>
+                                    <TouchableOpacity onPress={() => this.selectFilter('age')}><Image style={styles.filterImg} source={{ uri: 'https://img.icons8.com/ios/30/ffffff/lifecycle--v1.png' }} /></TouchableOpacity>
+                                    <TouchableOpacity onPress={() => this.selectFilter('sex')}><Image style={styles.filterImg} source={{ uri: 'https://img.icons8.com/ios/30/ffffff/gender.png' }} /></TouchableOpacity>
+                                    <TouchableOpacity onPress={this.clearAllFilters}><Image style={styles.filterImg} source={{ uri: 'https://img.icons8.com/ios/30/ffffff/clear-filters.png' }} /></TouchableOpacity>
                                 </View> : selectedFilter === 'search' ?
-                                    <View style={{ width: deviceWidth - 30, flexDirection: 'row', justifyContent: 'space-around' }}>
+                                    <View style={styles.searchInput}>
                                         <DelayInput
                                             value={nameSurnameValue}
                                             minLength={2}
-                                            onChangeText={(e) => {
-                                                this.setState({
-                                                    nameSurnameValue: e as string
-                                                });
-                                                this.applyFilters();
-                                            }}
+                                            onChangeText={(e) => this.search(e as string)}
                                             delayTimeout={400}
                                             style={styles.textInput}
                                         />
-                                        <TouchableOpacity
-                                            style={styles.closeButton}
-                                            onPress={() => this.setState({ selectedFilter: '' })}
-                                        >
-                                            <Image style={{ height: 30, width: 30 }} source={{ uri: 'https://img.icons8.com/ios/40/ffffff/delete-sign.png' }} />
-                                        </TouchableOpacity>
-                                    </View> : selectedFilter === 'age' ? <View style={{ width: deviceWidth - 30, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' }}>
+                                        <this.CloseFilter />
+                                    </View> : selectedFilter === 'age' ? <View style={styles.ageInput}>
                                         <View>
-                                            <Text style={{ color: '#fff' }}>From: </Text>
+                                            <Text style={styles.colorWhite}>From: </Text>
                                             <DelayInput
                                                 value={ageRange.from}
                                                 minLength={1}
-                                                onChangeText={(e) => {
-                                                    this.setState({
-                                                        ageRange: { from: e as string, to: ageRange.to }
-                                                    })
-                                                    this.applyFilters();
-                                                }}
+                                                onChangeText={(e) => this.inputFromAge(e as string)}
                                                 delayTimeout={400}
                                                 style={[styles.textInput, styles.textInputAge]}
                                             />
                                         </View>
-                                        <View style={{ marginLeft: 15 }}>
-                                            <Text style={{ color: '#fff' }}> To: </Text>
+                                        <View style={styles.mrLeft15}>
+                                            <Text style={styles.colorWhite}> To: </Text>
                                             <DelayInput
                                                 value={ageRange.to}
                                                 minLength={1}
-                                                onChangeText={(e) => {
-                                                    this.setState({
-                                                        ageRange: { from: ageRange.from, to: e as string }
-                                                    })
-                                                    this.applyFilters();
-                                                }}
+                                                onChangeText={(e) => this.inputToAge(e as string)}
                                                 delayTimeout={400}
                                                 style={[styles.textInput, styles.textInputAge]}
                                             />
                                         </View>
-                                        <TouchableOpacity
-                                            style={styles.closeButton}
-                                            onPress={() => this.setState({ selectedFilter: '' })}
-                                        >
-                                            <Image style={{ height: 30, width: 30 }} source={{ uri: 'https://img.icons8.com/ios/40/ffffff/delete-sign.png' }} />
-                                        </TouchableOpacity>
+                                        <this.CloseFilter />
                                     </View> : <View style={styles.filter}>
-                                            <Text>By sex: </Text>
-                                            {sexType.map((item: string) => {
-                                                return <TouchableOpacity onPress={async () => {
-                                                    await this.setState({
-                                                        selectedSex: item
-                                                    });
-                                                    this.applyFilters();
-                                                }}><Text>{item}</Text></TouchableOpacity>
-                                            })}
-                                            <TouchableOpacity
-                                                style={styles.closeButton}
-                                                onPress={() => this.setState({ selectedFilter: '' })}
-                                            >
-                                                <Image style={{ height: 30, width: 30 }} source={{ uri: 'https://img.icons8.com/ios/40/ffffff/delete-sign.png' }} />
-                                            </TouchableOpacity>
+                                            <Text style={styles.applyColor}>By sex: </Text>
+                                            <TouchableOpacity onPress={() => this.selectSexType(sexType.a)}><Text style={styles.applyColor}>{sexType.a}</Text></TouchableOpacity>
+                                            <TouchableOpacity onPress={() => this.selectSexType(sexType.b)}><Text style={styles.applyColor}>{sexType.b}</Text></TouchableOpacity>
+                                            <TouchableOpacity onPress={() => this.selectSexType(sexType.c)}><Text style={styles.applyColor}>{sexType.c}</Text></TouchableOpacity>
+                                            <this.CloseFilter />
                                         </View>
                         }
                     </View> : null}
 
                 {
-                    isLoading ? <View style={styles.usersList}><Loader /></View> : filteredData.length < 1 ? <View style={{marginTop: 65, alignSelf: 'center'}}><Text>There is no results</Text></View> : < FlatList
-                        style={styles.usersList}
-                        data={filteredData}
-                        renderItem={this._renderItem}
-                    />
+                    isLoading ? <View style={styles.usersList}><Loader /></View> :
+                        filteredData.length < 1 ? <View style={{ marginTop: 65, alignSelf: 'center' }}>
+                            <Text>
+                                There is no results
+
+                    </Text>
+                        </View> :
+                            < FlatList
+                                style={styles.usersList}
+                                data={filteredData}
+                                renderItem={({ item, index }) => renderItem(item, index, this.state.filteredData.length - 1)}
+                            />
                 }
             </SafeAreaView >
         )
@@ -247,116 +266,3 @@ class UsersFilter extends Component<Props, State> {
 }
 
 export default UsersFilter
-
-const styles = StyleSheet.create({
-    header: {
-        height: 50,
-        alignItems: 'center',
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        backgroundColor: 'royalblue',
-    },
-    totalUsers: {
-        color: '#fff',
-        padding: 15
-    },
-    filtersButton: {
-        color: '#fff',
-        padding: 15
-    },
-    usersList: {
-        height: deviceHeight - 70,
-    },
-    renderItem: {
-        marginHorizontal: 15,
-        paddingVertical: 5,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        borderBottomWidth: 1,
-        borderBottomColor: '#ddd'
-    },
-    avatarView: {
-        flexDirection: 'row'
-    },
-    userImage: {
-        width: 50,
-        height: 50,
-        borderRadius: 50
-    },
-    sexImage: {
-        width: 10,
-        height: 10,
-        position: 'absolute',
-        left: 0,
-        bottom: -5,
-    },
-    status: {
-        width: 10,
-        height: 10,
-        borderRadius: 50,
-        position: 'absolute',
-        right: 2,
-        top: 2
-    },
-    nameText: {
-        fontWeight: 'bold',
-        marginLeft: 10,
-    },
-    modalHeader: {
-        height: 50,
-        backgroundColor: 'royalblue',
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center'
-    },
-    modalTitle: {
-        color: '#fff'
-    },
-    closeButton: {
-        position: 'absolute',
-        right: 0,
-        // paddingRight: 15
-    },
-    closeButtonColor: {
-        color: '#fff'
-    },
-    filters: {
-        height: 61,
-        width: deviceWidth,
-        backgroundColor: 'rgba(65,105,255,0.9)',
-        flexDirection: 'row',
-        justifyContent: 'space-evenly',
-        alignItems: 'center',
-        position: 'absolute',
-        top: 50,
-        zIndex: 1,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ddd'
-    },
-    filter: {
-        paddingVertical: 20,
-        paddingHorizontal: 15
-    },
-    textInput: {
-        width: deviceWidth - 100,
-        backgroundColor: '#fff',
-        color: '#000',
-        fontSize: 24,
-        borderBottomWidth: 1,
-        borderBottomColor: '#ccc',
-    },
-    textInputAge: {
-        width: (deviceWidth - 40) / 3
-    },
-    applyButton: {
-        paddingVertical: 15,
-        backgroundColor: 'royalblue',
-        alignItems: 'center',
-        width: deviceWidth,
-        position: 'absolute',
-        bottom: 0
-    },
-    applyColor: {
-        color: '#fff'
-    }
-})
